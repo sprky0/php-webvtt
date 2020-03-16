@@ -26,3 +26,11 @@ $instance->parse($vttString);
 $instance->serialize($vttString);
 
 ```
+
+## Tests
+
+phpunit --bootstrap vendor/autoload.php tests/
+
+seems to be this way for now
+
+./vendor/phpunit/phpunit/phpunit --bootstrap vendor/autoload.php tests/

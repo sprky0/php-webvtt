@@ -1,6 +1,10 @@
 PHP WebVTT parser and validator
 ===========================
 
+This is a rough one to convert.  I should have written from scratch
+
+
+
 Relevant links:
 
 ### Original library in JS

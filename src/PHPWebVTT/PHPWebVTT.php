@@ -6,177 +6,191 @@ class PHPWebVTT {
 
 	const NEWLINE_REGEX = "/\r\n|\r|\n/";
 
+	// line pointer
+	protected $linePos = 0;
+
+	// array of lines
+	protected $lines = [];
+
+	// array of parsing errors
+	protected $errors = [];
+
+	/**
+	 * add a single error
+	 *
+	 * @param string $message
+	 * @param int $line
+	 * @param int $col
+	 */
+	protected function addError(string $message, int $line, int $col) : void {
+		$this->errors[] = [
+			"id"      => 0, // no notion of this in the lib but nice to have some day
+			"error"   => $message,
+			"line"    => $line + 1, // 1 indexed
+			"col"     => $col
+		];
+	}
+
 	public function parse(string $input, $mode) {
 
 		//XXX need global search and replace for \0
-		$startTime = time(); // new DateTime() Date.now();
-		$linePos = 0;
-		$lines = preg_split( self::NEWLINE_REGEX, $input );
+		$startTime = time(); // new Date.now();
+		$this->linePos = 0;
+		$this->lines = preg_split( self::NEWLINE_REGEX, $input );
+
 		$alreadyCollected  = false;
 		$cues = [];
-		$errors = [];
 
-		protected function addError(string $message, int $col) : void {
-			$this->errors[] = [
-				"message" => $message,
-				"line" => $linePos + 1,
-				"col" => $col
-			];
+		$line = $this->lines[$linePos];
+		$lineLength = line.length,
+		$signature = "WEBVTT";
+		$bom = 0;
+		$signatureLength = strlen($signature);
+
+		/* Byte order mark */
+		if ($line[0] === "\ufeff") {
+			$bom = 1
+			$signatureLength += 1
 		}
 
+		/* SIGNATURE */
+		if (
+			$lineLength < $signatureLength ||
+			line.indexOf($signature) !== 0+bom ||
+			lineLength > $signatureLength &&
+			line[$signatureLength] !== " " &&
+			line[$signatureLength] !== "\t"
+		) {
+			$this->addError("No valid signature. (File needs to start with \"WEBVTT\".)")
+		}
 
-			var line = $lines[$linePos],
-					lineLength = line.length,
-					signature = "WEBVTT",
-					bom = 0,
-					signature_length = signature.length;
+		linePos++
 
-			/* Byte order mark */
-			if (line[0] === "\ufeff") {
-				bom = 1
-				signature_length += 1
+		/* HEADER */
+		while($this->lines[$linePos] != "" && $this->lines[$linePos] != undefined) {
+			$this->addError("No blank line after the signature.")
+			if($this->lines[$linePos].indexOf("-->") != -1) {
+				$alreadyCollected = true
+				break
 			}
-
-			/* SIGNATURE */
-			if (
-				lineLength < signature_length ||
-				line.indexOf(signature) !== 0+bom ||
-				lineLength > signature_length &&
-				line[signature_length] !== " " &&
-				line[signature_length] !== "\t"
-			) {
-				$this->addError("No valid signature. (File needs to start with \"WEBVTT\".)")
-			}
-
 			linePos++
+		}
 
-			/* HEADER */
-			while($lines[$linePos] != "" && $lines[$linePos] != undefined) {
-				$this->addError("No blank line after the signature.")
-				if($lines[$linePos].indexOf("-->") != -1) {
-					alreadyCollected = true
-					break
-				}
+		/* CUE LOOP */
+		while($this->lines[$linePos] != undefined) {
+			var cue
+			while(!$alreadyCollected && $this->lines[$linePos] == "") {
 				linePos++
 			}
+			if(!$alreadyCollected && $this->lines[$linePos] == undefined)
+				break
 
-			/* CUE LOOP */
-			while($lines[$linePos] != undefined) {
-				var cue
-				while(!alreadyCollected && $lines[$linePos] == "") {
+			/* CUE CREATION */
+			cue = {
+				id:"",
+				startTime:0,
+				endTime:0,
+				pauseOnExit:false,
+				direction:"horizontal",
+				snapToLines:true,
+				linePosition:"auto",
+				textPosition:50,
+				size:100,
+				alignment:"middle",
+				text:"",
+				tree:null
+			}
+
+			var parseTimings = true;
+
+			if($this->lines[$linePos].indexOf("-->") == -1) {
+				cue.id = $this->lines[$linePos]
+
+				/* COMMENTS
+					 Not part of the specification's parser as these would just be ignored. However,
+					 we want them to be conforming and not get "Cue identifier cannot be standalone".
+				 */
+				if(/^NOTE($|[ \t])/.test(cue.id)) { // .startsWith fails in Chrome
 					linePos++
-				}
-				if(!alreadyCollected && $lines[$linePos] == undefined)
-					break
-
-				/* CUE CREATION */
-				cue = {
-					id:"",
-					startTime:0,
-					endTime:0,
-					pauseOnExit:false,
-					direction:"horizontal",
-					snapToLines:true,
-					linePosition:"auto",
-					textPosition:50,
-					size:100,
-					alignment:"middle",
-					text:"",
-					tree:null
-				}
-
-				var parseTimings = true;
-
-				if($lines[$linePos].indexOf("-->") == -1) {
-					cue.id = $lines[$linePos]
-
-					/* COMMENTS
-						 Not part of the specification's parser as these would just be ignored. However,
-						 we want them to be conforming and not get "Cue identifier cannot be standalone".
-					 */
-					if(/^NOTE($|[ \t])/.test(cue.id)) { // .startsWith fails in Chrome
-						linePos++
-						while($lines[$linePos] != "" && $lines[$linePos] != undefined) {
-							if($lines[$linePos].indexOf("-->") != -1)
-								$this->addError("Cannot have timestamp in a comment.")
-							linePos++
-						}
-						continue
-					}
-
-					linePos++
-
-					if($lines[$linePos] == "" || $lines[$linePos] == undefined) {
-						$this->addError("Cue identifier cannot be standalone.")
-						continue
-					}
-
-					if($lines[$linePos].indexOf("-->") == -1) {
-						parseTimings = false
-						$this->addError("Cue identifier needs to be followed by timestamp.")
-					}
-
-				}
-
-				/* TIMINGS */
-				alreadyCollected = false
-				var timings = new \PHPWebVTT\Parser\TimingsAndSettings::parse($lines[$linePos], &$this->addError);
-				var previousCueStart = 0
-				if(cues.length > 0) {
-					previousCueStart = cues[cues.length-1].startTime
-				}
-				if(parseTimings && !timings.parse(cue, previousCueStart)) {
-					/* BAD CUE */
-
-					cue = null
-					linePos++
-
-					/* BAD CUE LOOP */
-					while($lines[$linePos] != "" && $lines[$linePos] != undefined) {
-						if($lines[$linePos].indexOf("-->") != -1) {
-							alreadyCollected = true
-							break
-						}
+					while($this->lines[$linePos] != "" && $this->lines[$linePos] != undefined) {
+						if($this->lines[$linePos].indexOf("-->") != -1)
+							$this->addError("Cannot have timestamp in a comment.")
 						linePos++
 					}
 					continue
 				}
+
 				linePos++
 
-				/* CUE TEXT LOOP */
-				while($lines[$linePos] != "" && $lines[$linePos] != undefined) {
-					if($lines[$linePos].indexOf("-->") != -1) {
-						$this->addError("Blank line missing before cue.")
-						alreadyCollected = true
-						break
-					}
-					if(cue.text != "")
-						cue.text += "\n"
-					cue.text += $lines[$linePos]
-					linePos++
+				if($this->lines[$linePos] == "" || $this->lines[$linePos] == undefined) {
+					$this->addError("Cue identifier cannot be standalone.")
+					continue
 				}
 
-				/* CUE TEXT PROCESSING */
-				var cuetextparser = new WebVTTCueTextParser(cue.text, err, mode)
-				cue.tree = cuetextparser.parse(cue.startTime, cue.endTime)
-				cues.push(cue)
-			}
-			cues.sort(function(a, b) {
-				if (a.startTime < b.startTime)
-					return -1
-				if (a.startTime > b.startTime)
-					return 1
-				if (a.endTime > b.endTime)
-					return -1
-				if (a.endTime < b.endTime)
-					return 1
-				return 0
-			})
-			/* END */
-			return {cues:cues, errors:errors, time:Date.now()-startTime}
-		}
-	}
+				if($this->lines[$linePos].indexOf("-->") == -1) {
+					parseTimings = false
+					$this->addError("Cue identifier needs to be followed by timestamp.")
+				}
 
+			}
+
+			/* TIMINGS */
+			$alreadyCollected = false
+			var timings = new \PHPWebVTT\Parser\TimingsAndSettings::parse($this->lines[$linePos], &$this->addError);
+			var previousCueStart = 0
+			if(cues.length > 0) {
+				previousCueStart = cues[cues.length-1].startTime
+			}
+			if(parseTimings && !timings.parse(cue, previousCueStart)) {
+				/* BAD CUE */
+
+				cue = null
+				linePos++
+
+				/* BAD CUE LOOP */
+				while($this->lines[$linePos] != "" && $this->lines[$linePos] != undefined) {
+					if($this->lines[$linePos].indexOf("-->") != -1) {
+						$alreadyCollected = true
+						break
+					}
+					linePos++
+				}
+				continue
+			}
+			linePos++
+
+			/* CUE TEXT LOOP */
+			while($this->lines[$linePos] != "" && $this->lines[$linePos] != undefined) {
+				if($this->lines[$linePos].indexOf("-->") != -1) {
+					$this->addError("Blank line missing before cue.")
+					$alreadyCollected = true
+					break
+				}
+				if(cue.text != "")
+					cue.text += "\n"
+				cue.text += $this->lines[$linePos]
+				linePos++
+			}
+
+			/* CUE TEXT PROCESSING */
+			var cuetextparser = new WebVTTCueTextParser(cue.text, err, mode)
+			cue.tree = cuetextparser.parse(cue.startTime, cue.endTime)
+			cues.push(cue)
+		}
+		cues.sort(function(a, b) {
+			if (a.startTime < b.startTime)
+				return -1
+			if (a.startTime > b.startTime)
+				return 1
+			if (a.endTime > b.endTime)
+				return -1
+			if (a.endTime < b.endTime)
+				return 1
+			return 0
+		})
+		/* END */
+		return {cues:cues, errors:errors, time:Date.now()-startTime}
+	}
 }
 
 

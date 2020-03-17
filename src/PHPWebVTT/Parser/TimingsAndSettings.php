@@ -4,7 +4,7 @@ namespace PHPWebVTT\Parser\TimingsAndSettings;
 
 class TimingsAndSettings {
 
-	public static function parse(string $line, callable $errorHandler) {
+	public static function parse(string $line, callable &$errorHandler) {
 
 	var SPACE = /[\u0020\t\f]/,
 			NOSPACE = /[^\u0020\t\f]/,

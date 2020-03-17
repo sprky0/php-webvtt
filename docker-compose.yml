@@ -1,0 +1,7 @@
+version: "3.7"
+services:
+  webvtt:
+    build: .
+    volumes:
+      - ./:/var/test
+    entrypoint: /var/test/build/testloop.sh
